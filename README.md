@@ -1,5 +1,6 @@
 # TransitGraphAI
 > *Work in progress – code will be released soon.*
+
 This project explores the intersection between **urban mobility**, **graph representation learning**, and **autonomous decision-making**.  
 It combines **generative AI** and **reinforcement learning** to model and simulate realistic public transport networks and traveler behaviors.
 
