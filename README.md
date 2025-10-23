@@ -1,45 +1,132 @@
 # TransitGraphAI
-> *Work in progress – code will be released soon.*
 
-This project explores the intersection between **urban mobility**, **graph representation learning**, and **autonomous decision-making**.  
-It combines **generative AI** and **reinforcement learning** to model and simulate realistic public transport networks and traveler behaviors.
+**TransitGraphAI** explores the intersection of **transport network modeling**, **graph generative models**, and **reinforcement learning for time-dependent routing**.  
+The goal is to build and experiment with AI systems capable of *understanding, generating, and navigating* complex multimodal public transport networks.
+
+This repository now includes the full code and notebooks used for data collection, preprocessing, generative modeling, and reinforcement learning experiments.
 
 ---
 
 ## Project Overview
 
-The project is based on an extensive sampling of **GTFS data** (General Transit Feed Specification) from **16 European public transport networks**.  
-After collection, the data was reformatted to build **time-dependent multimodal transport graphs**, including routes, interconnections, and schedules.
+The project is structured around three main pipelines:
 
-Two main research directions are being developed in parallel:
+1. **Data Collection & Selection (`data_collection.ipynb`)**  
+   - Scrapes and filters open GTFS feeds (via the MobilityData catalog on GitHub)  
+   - Focuses on **Western European networks**, balancing coverage and tractability  
+   - Validates the presence of key GTFS tables (`stops`, `routes`, `trips`, `stop_times`, `calendar*`, `transfers`)  
+   - Outputs a curated subset of networks for downstream experiments
 
-### (1) Generative Modeling of Transport Graphs
-I experimented with **graph generative models** such as:
-- **Variational Autoencoders (VAE)**  
-- **VAE-GAN hybrids**
+2. **Graph Preprocessing & Augmentation (`preprocessing_augmentation.ipynb`)**  
+   - Converts GTFS data into **station-level time-dependent graphs**  
+   - Fuses stops into stations via geometric proximity (Haversine) and declared parent_station  
+   - Builds **trip edges** (with departure/arrival times) and **transfer edges** (walking connections)  
+   - Provides utilities for constructing **contextual graphs** and exporting them to serialized datasets  
+   - Includes proof-of-concept experiments with **graph generative models (VAE / VAE-GAN)** trained on synthetic Erdős–Rényi graphs, to evaluate the feasibility of network synthesis before scaling to real GTFS graphs
 
-The objective is to generate **synthetic transport networks** that capture structural properties of real urban systems (connectivity, modularity, hub density, etc.).  
-
-For the initial proof of concept, models were trained on **Erdős–Rényi random graphs**, as real GTFS-derived adjacency matrices are currently too large for direct training.  
-Future iterations will include a compressed graph representation to handle real-world data efficiently.
-
----
-
-### (2) Autonomous Agent for Route Optimization
-In a second part of the project, I prototyped an **autonomous agent** trained via **Proximal Policy Optimization (PPO)**.  
-The agent learns to **find the fastest route between two stations**, given:
-- A **departure station and time**
-- Limited local knowledge of the network (no full map access)
-- Dynamic constraints from transport schedules
-
-The goal is to explore how **reinforcement learning** can approximate human-like route-finding behavior under uncertainty.
+3. **Reinforcement Learning (`reinforcement_learning.ipynb`)**  
+   - Defines a **time-dependent routing environment** derived from preprocessed GTFS data  
+   - Implements a **Proximal Policy Optimization (PPO)** agent that learns to find a route from a start station to a destination, given a departure time  
+   - The agent interacts with a time-aware environment that dynamically filters feasible outgoing edges based on schedule constraints  
+   - Current experiments focus on the **Trentino transport network**, serving as a small-scale benchmark
 
 ---
 
-## Goals and Perspectives
+## Repository Structure
 
-- Create **synthetic transport networks** preserving real-world topological and temporal patterns  
-- Simulate **adaptive navigation strategies** in dynamic environments  
-- Build a bridge between **graph generation**, **transport modeling**, and **reinforcement learning**
+```
+├── data_collection.ipynb          # GTFS scraping, filtering and network selection
+├── preprocessing_augmentation.ipynb  # Graph preprocessing + generative modeling POC
+├── reinforcement_learning.ipynb   # PPO training on time-dependent routing environment
+│
+├── utils/
+│   ├── preprocessing.py            # GTFS → graph preprocessing and fusion utilities
+│   ├── generative_models.py        # GraphVAE / GraphGAN architectures and training
+│   └── ppo.py                      # PPO agent, policy/critic networks, and training loop
+│
+├── data_collection/                # Cached GTFS feed metadata and selection tables
+├── gtfs_data/                      # Downloaded raw GTFS zip files (excluded from repo)
+├── preprocessed_data/              # Serialized and cleaned network graphs (excluded from repo apart from an example for the Trentino network)
+│
+└── README.md
+```
 
+---
 
+## Dependencies
+
+Python ≥ 3.10  
+Main libraries:
+- `pandas`, `numpy`, `matplotlib`, `networkx`
+- `torch`, `gymnasium`, `tqdm`
+- `scikit-learn`, `optuna`
+- `lightgbm`, `mlflow`, `shap`
+- `requests`, `geopy`, `pyproj`
+
+You can install all dependencies via:
+```bash
+pip install -r requirements.txt
+```
+
+---
+
+## Methodology
+
+### Data & Graph Construction
+GTFS datasets are parsed into multimodal graphs where:
+- **Nodes** = fused stations (stop clusters)
+- **Edges** = either trip-based (scheduled) or transfer-based (walking)
+- **Attributes** = departure time, duration, and edge type
+
+A preprocessing pipeline (`utils/preprocessing.py`) handles stop fusion, timetable extraction, time normalization, and edge augmentation.  
+This results in a compact representation suitable for both graph learning and simulation.
+
+### Generative Modeling (POC)
+The goal is to eventually **augment the dataset** with *synthetic transport networks* generated by neural models.  
+For now, proof-of-concept experiments have been conducted using:
+- **GraphVAE**: GCN encoder + inner-product decoder trained on random Erdős–Rényi graphs  
+- **GraphGAN / VAE–GAN hybrid**: adversarial fine-tuning to improve graph realism  
+These early trials focus on validating the learning setup, reconstruction quality, and scalability rather than producing directly usable synthetic data.
+
+### Reinforcement Learning
+A custom **time-dependent routing environment** (`utils/ppo.py`) models realistic journey planning:
+- At each timestep, the agent observes:
+  - its current station  
+  - the destination  
+  - a sinusoidal encoding of the current time  
+  - a truncated list of feasible outgoing edges (options)
+- It must select the best option given schedule constraints and transfer possibilities.
+
+The **PPO algorithm** optimizes the policy to minimize travel time while respecting service availability.  
+Training uses a curriculum (“easy mode”) in early episodes, where the destination is nearby, to bootstrap learning.
+
+---
+
+## Results & Current Status
+
+- **Data preprocessing**: functional for multiple European networks (≈20 feeds)  
+- **Graph augmentation**: generative models trained successfully on synthetic graphs (Erdős–Rényi), demonstrating stable reconstruction and latent interpolation  
+- **Reinforcement learning**: PPO environment fully operational, with policy and critic networks trained on the **Trentino** dataset  
+
+However, performance remains limited:  
+*Under current hyperparameters, fewer than 10% of PPO agents reach their destination successfully.*  
+The agent learns partial navigation strategies (local transfers and short-horizon planning) but struggles with long-range routing and sparse success rewards.  
+These results highlight the need for:
+- richer reward shaping  
+- larger rollout horizons or recurrent policies  
+- inclusion of temporal attention or transformer-based encoders
+
+---
+Data source:  
+> MobilityData GTFS catalog — https://github.com/MobilityData/mobility-database-catalogs  
+
+---
+
+## Author
+
+**TransitGraphAI** is a personal research project, combining interests in **transport systems**, **graph learning**, and **reinforcement learning**.  
+It aims to explore how AI can *model, generate, and navigate* complex multimodal mobility networks.
+
+---
+
+*Status: research prototype — work in progress (POC stage for generative and RL components).*
