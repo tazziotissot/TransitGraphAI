@@ -6,3 +6,4 @@ torch==2.2.2
 networkx==2.8.8
 tqdm==4.66.5
 gym==0.26.2
+requests==2.32.3
