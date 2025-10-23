@@ -59,9 +59,7 @@ Python ≥ 3.10
 Main libraries:
 - `pandas`, `numpy`, `matplotlib`, `networkx`
 - `torch`, `gymnasium`, `tqdm`
-- `scikit-learn`, `optuna`
-- `lightgbm`, `mlflow`, `shap`
-- `requests`, `geopy`, `pyproj`
+- `scikit-learn`, `requests`
 
 You can install all dependencies via:
 ```bash
